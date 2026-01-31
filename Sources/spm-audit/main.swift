@@ -10,7 +10,7 @@ import ArgumentParser
 
 // MARK: - Version
 
-let currentVersion = "0.1.0"
+let currentVersion = "0.1.1"
 
 // MARK: - Version Checker
 
