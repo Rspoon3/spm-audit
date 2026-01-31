@@ -109,94 +109,32 @@ The `PackageUpdateChecker` class exposes several public test helpers:
 
 ## Releasing New Versions
 
-When creating a new release, follow these steps to update both GitHub and the Homebrew tap:
-
-### 1. Update Version Number
-
-Edit `Sources/spm-audit/main.swift` and update the version constant:
-```swift
-let currentVersion = "0.1.2"  // Update this
-```
-
-Commit and push:
-```bash
-git add Sources/spm-audit/main.swift
-git commit -m "Bump version to 0.1.2"
-git push origin main
-```
-
-### 2. Create Git Tag and GitHub Release
+Use the automated release script to create a new version:
 
 ```bash
-# Create and push tag
-git tag -a 0.1.2 -m "Release 0.1.2: Description"
-git push origin 0.1.2
-
-# Create GitHub release (update notes as needed)
-gh release create 0.1.2 \
-  --title "0.1.2 - Feature Name" \
-  --notes "## What's New
-- Feature 1
-- Feature 2
-
-## Installation
-\`\`\`bash
-brew upgrade rspoon3/tap/spm-audit
-\`\`\`"
+./release.sh <version> [release-notes]
 ```
 
-### 3. Update Homebrew Formula
-
-Calculate the SHA256 for the new release:
+**Example:**
 ```bash
-curl -sL https://github.com/Rspoon3/spm-audit/archive/refs/tags/0.1.2.tar.gz | shasum -a 256
+./release.sh 0.1.2 "Add automatic version checking"
 ```
 
-Update the formula in the `homebrew-tap` repository:
-```bash
-cd /tmp
-git clone https://github.com/Rspoon3/homebrew-tap.git
-cd homebrew-tap
+**What the script does:**
+1. Updates version constant in `Sources/spm-audit/main.swift`
+2. Commits and pushes the version bump
+3. Creates and pushes a git tag
+4. Creates a GitHub release with notes
+5. Calculates SHA256 for the release tarball
+6. Updates the Homebrew formula in `homebrew-tap` repository
+7. Pushes the formula update
 
-# Edit Formula/spm-audit.rb:
-# - Update url to new version
-# - Update sha256 with calculated hash
-
-git add Formula/spm-audit.rb
-git commit -m "Update spm-audit to 0.1.2"
-git push origin main
-```
-
-**Formula template:**
-```ruby
-class SpmAudit < Formula
-  desc "Audit and update Swift Package Manager dependencies"
-  homepage "https://github.com/Rspoon3/spm-audit"
-  url "https://github.com/Rspoon3/spm-audit/archive/refs/tags/0.1.2.tar.gz"
-  sha256 "NEW_SHA256_HERE"
-  license "MIT"
-
-  depends_on xcode: ["14.0", :build]
-
-  def install
-    system "swift", "build", "-c", "release", "--disable-sandbox"
-    bin.install ".build/release/spm-audit"
-  end
-
-  test do
-    system "#{bin}/spm-audit", "--version"
-  end
-end
-```
-
-### 4. Verify Release
-
-Users can now update:
+After running, users can update via:
 ```bash
 brew upgrade rspoon3/tap/spm-audit
 ```
 
-The automatic version checker will notify users on the old version that a new release is available.
+The automatic version checker will notify users on older versions that a new release is available.
 
 ## Code Patterns and Conventions
 
