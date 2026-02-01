@@ -24,7 +24,7 @@ enum OutputFormatter {
 
         // Create table with columns
         let table = ASCIITable(columns: ["Package", "Type", "Current", "Swift", "Latest", "Status",
-                                          "README", "License", "CLAUDE.md", "AGENTS.md"])
+                                          "README", "License", "CLAUDE.md", "AGENTS.md", "Last Commit"])
 
         // Add rows for each result
         for result in results {
@@ -37,9 +37,10 @@ enum OutputFormatter {
             let claude = getFileIndicator(result.claudeFileStatus)
             let agents = getFileIndicator(result.agentsFileStatus)
             let (latest, status) = getLatestAndStatus(result.status)
+            let lastCommit = result.lastCommitDate ?? "N/A"
 
             table.addRow([name, type, current, swift, latest, status,
-                          readme, license, claude, agents])
+                          readme, license, claude, agents, lastCommit])
         }
 
         // Print the table

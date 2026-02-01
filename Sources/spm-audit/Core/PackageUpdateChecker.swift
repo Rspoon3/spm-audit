@@ -154,7 +154,8 @@ final class PackageUpdateChecker: Sendable {
                 readmeStatus: readmeStatus,
                 licenseType: licenseType,
                 claudeFileStatus: claudeFileStatus,
-                agentsFileStatus: agentsFileStatus
+                agentsFileStatus: agentsFileStatus,
+                lastCommitDate: nil
             )
 
             results.append(result)
@@ -265,7 +266,8 @@ final class PackageUpdateChecker: Sendable {
                 readmeStatus: .unknown,
                 licenseType: .unknown,
                 claudeFileStatus: .unknown,
-                agentsFileStatus: .unknown
+                agentsFileStatus: .unknown,
+                lastCommitDate: nil
             )
         }
 
@@ -275,6 +277,9 @@ final class PackageUpdateChecker: Sendable {
         let repo = repoWithGit.replacingOccurrences(of: ".git", with: "")
 
         let result = await githubClient.fetchLatestRelease(owner: owner, repo: repo, package: package)
+
+        // Fetch last commit date
+        let lastCommitDate = await githubClient.fetchLastCommitDate(owner: owner, repo: repo)
 
         // Check README, license, CLAUDE.md, AGENTS.md, and Swift version in the dependency's checkout directory
         // This works for both SPM projects and Xcode projects (DerivedData)
@@ -302,7 +307,8 @@ final class PackageUpdateChecker: Sendable {
             readmeStatus: readmeStatus,
             licenseType: licenseType,
             claudeFileStatus: claudeFileStatus,
-            agentsFileStatus: agentsFileStatus
+            agentsFileStatus: agentsFileStatus,
+            lastCommitDate: lastCommitDate
         )
     }
 

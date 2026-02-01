@@ -22,3 +22,15 @@ struct GitHubRelease: Codable {
 struct GitHubTag: Codable {
     let name: String
 }
+
+struct GitHubCommit: Codable {
+    let commit: CommitDetails
+
+    struct CommitDetails: Codable {
+        let committer: CommitCommitter
+
+        struct CommitCommitter: Codable {
+            let date: String
+        }
+    }
+}

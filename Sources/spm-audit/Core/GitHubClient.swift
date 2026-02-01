@@ -51,7 +51,7 @@ final class GitHubClient: Sendable {
         let urlString = "https://api.github.com/repos/\(owner)/\(repo)/releases"
 
         guard let url = URL(string: urlString) else {
-            return PackageUpdateResult(package: package, status: .error("Invalid API URL"), readmeStatus: .unknown, licenseType: .unknown, claudeFileStatus: .unknown, agentsFileStatus: .unknown)
+            return PackageUpdateResult(package: package, status: .error("Invalid API URL"), readmeStatus: .unknown, licenseType: .unknown, claudeFileStatus: .unknown, agentsFileStatus: .unknown, lastCommitDate: nil)
         }
 
         var request = URLRequest(url: url)
@@ -66,7 +66,7 @@ final class GitHubClient: Sendable {
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                return PackageUpdateResult(package: package, status: .error("Invalid response"), readmeStatus: .unknown, licenseType: .unknown, claudeFileStatus: .unknown, agentsFileStatus: .unknown)
+                return PackageUpdateResult(package: package, status: .error("Invalid response"), readmeStatus: .unknown, licenseType: .unknown, claudeFileStatus: .unknown, agentsFileStatus: .unknown, lastCommitDate: nil)
             }
 
             // If releases endpoint returns 404, fall back to tags
@@ -81,7 +81,8 @@ final class GitHubClient: Sendable {
                     readmeStatus: .unknown,
                     licenseType: .unknown,
                     claudeFileStatus: .unknown,
-                    agentsFileStatus: .unknown
+                    agentsFileStatus: .unknown,
+                    lastCommitDate: nil
                 )
             }
 
@@ -104,7 +105,8 @@ final class GitHubClient: Sendable {
                     readmeStatus: .unknown,
                     licenseType: .unknown,
                     claudeFileStatus: .unknown,
-                    agentsFileStatus: .unknown
+                    agentsFileStatus: .unknown,
+                    lastCommitDate: nil
                 )
             } else {
                 return PackageUpdateResult(
@@ -113,7 +115,8 @@ final class GitHubClient: Sendable {
                     readmeStatus: .unknown,
                     licenseType: .unknown,
                     claudeFileStatus: .unknown,
-                    agentsFileStatus: .unknown
+                    agentsFileStatus: .unknown,
+                    lastCommitDate: nil
                 )
             }
 
@@ -124,7 +127,8 @@ final class GitHubClient: Sendable {
                 readmeStatus: .unknown,
                 licenseType: .unknown,
                 claudeFileStatus: .unknown,
-                agentsFileStatus: .unknown
+                agentsFileStatus: .unknown,
+                lastCommitDate: nil
             )
         }
     }
@@ -134,7 +138,7 @@ final class GitHubClient: Sendable {
         let urlString = "https://api.github.com/repos/\(owner)/\(repo)/tags?per_page=100"
 
         guard let url = URL(string: urlString) else {
-            return PackageUpdateResult(package: package, status: .error("Invalid API URL"), readmeStatus: .unknown, licenseType: .unknown, claudeFileStatus: .unknown, agentsFileStatus: .unknown)
+            return PackageUpdateResult(package: package, status: .error("Invalid API URL"), readmeStatus: .unknown, licenseType: .unknown, claudeFileStatus: .unknown, agentsFileStatus: .unknown, lastCommitDate: nil)
         }
 
         var request = URLRequest(url: url)
@@ -148,11 +152,11 @@ final class GitHubClient: Sendable {
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                return PackageUpdateResult(package: package, status: .error("Invalid response"), readmeStatus: .unknown, licenseType: .unknown, claudeFileStatus: .unknown, agentsFileStatus: .unknown)
+                return PackageUpdateResult(package: package, status: .error("Invalid response"), readmeStatus: .unknown, licenseType: .unknown, claudeFileStatus: .unknown, agentsFileStatus: .unknown, lastCommitDate: nil)
             }
 
             if httpResponse.statusCode == 404 {
-                return PackageUpdateResult(package: package, status: .noReleases, readmeStatus: .unknown, licenseType: .unknown, claudeFileStatus: .unknown, agentsFileStatus: .unknown)
+                return PackageUpdateResult(package: package, status: .noReleases, readmeStatus: .unknown, licenseType: .unknown, claudeFileStatus: .unknown, agentsFileStatus: .unknown, lastCommitDate: nil)
             }
 
             guard httpResponse.statusCode == 200 else {
@@ -162,7 +166,8 @@ final class GitHubClient: Sendable {
                     readmeStatus: .unknown,
                     licenseType: .unknown,
                     claudeFileStatus: .unknown,
-                    agentsFileStatus: .unknown
+                    agentsFileStatus: .unknown,
+                    lastCommitDate: nil
                 )
             }
 
@@ -182,7 +187,7 @@ final class GitHubClient: Sendable {
                 }
 
             guard let latestTag = validTags.first else {
-                return PackageUpdateResult(package: package, status: .noReleases, readmeStatus: .unknown, licenseType: .unknown, claudeFileStatus: .unknown, agentsFileStatus: .unknown)
+                return PackageUpdateResult(package: package, status: .noReleases, readmeStatus: .unknown, licenseType: .unknown, claudeFileStatus: .unknown, agentsFileStatus: .unknown, lastCommitDate: nil)
             }
 
             let latestVersion = VersionHelpers.normalize(latestTag.normalized)
@@ -194,7 +199,8 @@ final class GitHubClient: Sendable {
                     readmeStatus: .unknown,
                     licenseType: .unknown,
                     claudeFileStatus: .unknown,
-                    agentsFileStatus: .unknown
+                    agentsFileStatus: .unknown,
+                    lastCommitDate: nil
                 )
             } else {
                 return PackageUpdateResult(
@@ -203,7 +209,8 @@ final class GitHubClient: Sendable {
                     readmeStatus: .unknown,
                     licenseType: .unknown,
                     claudeFileStatus: .unknown,
-                    agentsFileStatus: .unknown
+                    agentsFileStatus: .unknown,
+                    lastCommitDate: nil
                 )
             }
 
@@ -214,7 +221,8 @@ final class GitHubClient: Sendable {
                 readmeStatus: .unknown,
                 licenseType: .unknown,
                 claudeFileStatus: .unknown,
-                agentsFileStatus: .unknown
+                agentsFileStatus: .unknown,
+                lastCommitDate: nil
             )
         }
     }
@@ -288,6 +296,54 @@ final class GitHubClient: Sendable {
             }
         } catch {
             return .unknown
+        }
+    }
+
+    func fetchLastCommitDate(owner: String, repo: String) async -> String? {
+        let urlString = "https://api.github.com/repos/\(owner)/\(repo)/commits?per_page=1"
+
+        guard let url = URL(string: urlString) else {
+            return nil
+        }
+
+        var request = URLRequest(url: url)
+        request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
+
+        if let token = githubToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return nil
+            }
+
+            guard httpResponse.statusCode == 200 else {
+                return nil
+            }
+
+            let commits = try JSONDecoder().decode([GitHubCommit].self, from: data)
+
+            guard let latestCommit = commits.first else {
+                return nil
+            }
+
+            // Parse and format the date
+            let dateString = latestCommit.commit.committer.date
+            let isoFormatter = ISO8601DateFormatter()
+
+            if let date = isoFormatter.date(from: dateString) {
+                let displayFormatter = DateFormatter()
+                displayFormatter.dateStyle = .medium
+                displayFormatter.timeStyle = .none
+                return displayFormatter.string(from: date)
+            }
+
+            return nil
+        } catch {
+            return nil
         }
     }
 }

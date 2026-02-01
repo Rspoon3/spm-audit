@@ -514,7 +514,8 @@ struct ReadmeStatusTests {
             readmeStatus: .present,
             licenseType: .mit,
             claudeFileStatus: .unknown,
-            agentsFileStatus: .unknown
+            agentsFileStatus: .unknown,
+            lastCommitDate: nil
         )
 
         let missingResult = PackageUpdateResult(
@@ -523,7 +524,8 @@ struct ReadmeStatusTests {
             readmeStatus: .missing,
             licenseType: .missing,
             claudeFileStatus: .unknown,
-            agentsFileStatus: .unknown
+            agentsFileStatus: .unknown,
+            lastCommitDate: nil
         )
 
         let unknownResult = PackageUpdateResult(
@@ -532,7 +534,8 @@ struct ReadmeStatusTests {
             readmeStatus: .unknown,
             licenseType: .unknown,
             claudeFileStatus: .unknown,
-            agentsFileStatus: .unknown
+            agentsFileStatus: .unknown,
+            lastCommitDate: nil
         )
 
         #expect(presentResult.readmeStatus == .present)
@@ -580,7 +583,8 @@ struct ReadmeStatusTests {
             readmeStatus: .present,
             licenseType: .apache,
             claudeFileStatus: .unknown,
-            agentsFileStatus: .unknown
+            agentsFileStatus: .unknown,
+            lastCommitDate: nil
         )
 
         #expect(result.readmeStatus == .present)
@@ -684,124 +688,4 @@ extension PackageUpdater {
     }
 }
 
-struct OutputFormatterTests {
-
-    @Test("Generate pipe-delimited with correct structure")
-    func testPipeDelimitedGeneration() async throws {
-        let package = PackageInfo(
-            name: "TestPackage",
-            url: "https://github.com/test/package",
-            currentVersion: "1.0.0",
-            filePath: "/test/path",
-            requirementType: .exact,
-            swiftVersion: "5.9"
-        )
-
-        let result = PackageUpdateResult(
-            package: package,
-            status: .updateAvailable(current: "1.0.0", latest: "1.2.0"),
-            readmeStatus: .present,
-            licenseType: .mit,
-            claudeFileStatus: .missing,
-            agentsFileStatus: .missing
-        )
-
-        let results = [result]
-        let pipeDelimited = OutputFormatter.generatePipeDelimitedPublic(results)
-
-        let lines = pipeDelimited.split(separator: "\n")
-        #expect(lines.count == 2) // Header + 1 row
-        #expect(lines[0].contains("| Package | Type | Current"))
-        // Split by | gives: ["", " Package ", " Type ", ..., " AGENTS.md ", ""]
-        // That's 10 columns + 2 empty strings from leading/trailing pipes = 12 total
-        // But split(separator:) drops empty strings by default, so we get 10 fields
-        let fields = lines[1].split(separator: "|")
-        #expect(fields.count == 10) // 10 actual data fields
-    }
-
-    @Test("Format with column command")
-    func testColumnFormatting() async throws {
-        let pipeDelimited = "| Name | Version |\n| Pkg1 | 1.0.0 |\n| Package2 | 2.0.0 |"
-
-        do {
-            let formatted = try OutputFormatter.formatWithColumnPublic(pipeDelimited)
-
-            #expect(formatted.contains("Name"))
-            #expect(formatted.contains("Version"))
-            #expect(formatted.contains("|"))
-        } catch {
-            // If column command fails (shouldn't on macOS), test passes
-            #expect(Bool(true))
-        }
-    }
-
-    @Test("Fallback formatting works without column")
-    func testFallbackFormatting() async throws {
-        let pipeDelimited = "| Name | Version |\n| Pkg1 | 1.0.0 |\n| Package2 | 2.0.0 |"
-        let formatted = OutputFormatter.formatFallbackPublic(pipeDelimited)
-
-        #expect(formatted.contains("Name"))
-        #expect(formatted.contains("Version"))
-        #expect(formatted.contains("|"))
-
-        // Verify it has proper structure
-        let lines = formatted.split(separator: "\n")
-        #expect(lines.count == 3) // Header + 2 rows
-    }
-
-    @Test("Separator generation from aligned line")
-    func testSeparatorGeneration() async throws {
-        let alignedLine = "| Package  | Type  | Current |"
-        let separator = OutputFormatter.generateSeparatorPublic(from: alignedLine)
-
-        // Each character is replaced: | becomes +, everything else becomes -
-        #expect(separator == "+----------+-------+---------+")
-    }
-
-    @Test("Pipe-delimited format has correct headers")
-    func testPipeDelimitedHeaders() async throws {
-        let package = PackageInfo(
-            name: "TestPackage",
-            url: "https://github.com/test/package",
-            currentVersion: "1.0.0",
-            filePath: "/test/path",
-            requirementType: .upToNextMajor,
-            swiftVersion: nil
-        )
-
-        let result = PackageUpdateResult(
-            package: package,
-            status: .upToDate("1.0.0"),
-            readmeStatus: .unknown,
-            licenseType: .apache,
-            claudeFileStatus: .unknown,
-            agentsFileStatus: .unknown
-        )
-
-        let results = [result]
-        let pipeDelimited = OutputFormatter.generatePipeDelimitedPublic(results)
-
-        // Verify all expected headers are present
-        #expect(pipeDelimited.contains("Package"))
-        #expect(pipeDelimited.contains("Type"))
-        #expect(pipeDelimited.contains("Current"))
-        #expect(pipeDelimited.contains("Swift"))
-        #expect(pipeDelimited.contains("Latest"))
-        #expect(pipeDelimited.contains("Status"))
-        #expect(pipeDelimited.contains("README"))
-        #expect(pipeDelimited.contains("License"))
-        #expect(pipeDelimited.contains("CLAUDE.md"))
-        #expect(pipeDelimited.contains("AGENTS.md"))
-    }
-
-    @Test("Fallback formatter handles emoji correctly")
-    func testFallbackFormatterWithEmoji() async throws {
-        let pipeDelimited = "| Package | Status |\n| TestPkg | ✅ Up to date |\n| OtherPkg | ⚠️  Update available |"
-        let formatted = OutputFormatter.formatFallbackPublic(pipeDelimited)
-
-        // Verify emojis are preserved
-        #expect(formatted.contains("✅"))
-        #expect(formatted.contains("⚠️"))
-        #expect(formatted.contains("|"))
-    }
-}
+// OutputFormatter tests removed - using ASCIITable library now
