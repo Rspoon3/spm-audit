@@ -130,6 +130,10 @@ struct GitHubRelease: Codable {
     }
 }
 
+struct GitHubTag: Codable {
+    let name: String
+}
+
 struct PackageUpdateResult {
     let package: PackageInfo
     let status: UpdateStatus
@@ -303,8 +307,9 @@ final class PackageUpdateChecker: Sendable {
                 let url = nsContent.substring(with: urlRange)
                 let version = nsContent.substring(with: versionRange)
 
-                // Extract package name from URL
-                let name = url.components(separatedBy: "/").last ?? "Unknown"
+                // Extract package name from URL and strip .git suffix
+                let nameWithGit = url.components(separatedBy: "/").last ?? "Unknown"
+                let name = nameWithGit.replacingOccurrences(of: ".git", with: "")
 
                 packages.append(PackageInfo(
                     name: name,
@@ -419,7 +424,9 @@ final class PackageUpdateChecker: Sendable {
         }
 
         let owner = components[ownerIndex + 1]
-        let repo = components[ownerIndex + 2]
+        let repoWithGit = components[ownerIndex + 2]
+        // Strip .git suffix if present (GitHub API requires URLs without .git)
+        let repo = repoWithGit.replacingOccurrences(of: ".git", with: "")
 
         return await fetchLatestRelease(owner: owner, repo: repo, package: package)
     }
@@ -543,8 +550,54 @@ final class PackageUpdateChecker: Sendable {
         }
     }
 
-    private func fetchLatestRelease(owner: String, repo: String, package: PackageInfo) async -> PackageUpdateResult {
-        let urlString = "https://api.github.com/repos/\(owner)/\(repo)/releases"
+    private func isValidSemverTag(_ tag: String) -> Bool {
+        // Check if tag is a valid semantic version (after normalization)
+        let normalized = normalizeTagName(tag)
+        let components = normalized.split(separator: ".")
+
+        // Must have 2-3 components (major.minor or major.minor.patch)
+        guard components.count >= 2 && components.count <= 3 else {
+            return false
+        }
+
+        // Each component should start with a digit
+        return components.allSatisfy { component in
+            guard let firstChar = component.first else { return false }
+            return firstChar.isNumber
+        }
+    }
+
+    private func normalizeTagName(_ tag: String) -> String {
+        var normalized = tag
+
+        // Remove common prefixes
+        let prefixes = ["v", "release/", "version/"]
+        for prefix in prefixes {
+            if normalized.lowercased().hasPrefix(prefix) {
+                normalized = String(normalized.dropFirst(prefix.count))
+            }
+        }
+
+        // Remove package name prefix (e.g., "wire-3.0.1" -> "3.0.1")
+        // Pattern: packagename-X.Y.Z where X, Y, Z are numbers
+        if normalized.range(of: #"^[a-zA-Z]+-(\d+\.\d+\.?\d*)$"#, options: .regularExpression) != nil {
+            if let dashIndex = normalized.lastIndex(of: "-") {
+                normalized = String(normalized[normalized.index(after: dashIndex)...])
+            }
+        }
+
+        return normalized.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func isPrerelease(_ tag: String) -> Bool {
+        let lowercased = tag.lowercased()
+        let prereleaseMarkers = ["-alpha", "-beta", "-rc", "-pre", "-dev", "-snapshot", ".alpha", ".beta", ".rc"]
+        return prereleaseMarkers.contains { lowercased.contains($0) }
+    }
+
+    private func fetchLatestTag(owner: String, repo: String, package: PackageInfo) async -> PackageUpdateResult {
+        // Request more tags per page (GitHub allows up to 100)
+        let urlString = "https://api.github.com/repos/\(owner)/\(repo)/tags?per_page=100"
 
         guard let url = URL(string: urlString) else {
             return PackageUpdateResult(package: package, status: .error("Invalid API URL"))
@@ -553,7 +606,6 @@ final class PackageUpdateChecker: Sendable {
         var request = URLRequest(url: url)
         request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
 
-        // Add GitHub token if available (for private repos)
         if let token = githubToken {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
@@ -576,13 +628,89 @@ final class PackageUpdateChecker: Sendable {
                 )
             }
 
+            let tags = try JSONDecoder().decode([GitHubTag].self, from: data)
+
+            // Filter tags to find valid semver tags that are not prereleases
+            let validTags = tags
+                .map { $0.name }
+                .filter { !isPrerelease($0) }
+                .filter { isValidSemverTag($0) }
+                .map { (original: $0, normalized: normalizeTagName($0)) }
+                .sorted { tag1, tag2 in
+                    // Sort by semantic version (descending)
+                    let v1 = normalizeVersion(tag1.normalized)
+                    let v2 = normalizeVersion(tag2.normalized)
+                    return compareVersions(v1, v2)
+                }
+
+            guard let latestTag = validTags.first else {
+                return PackageUpdateResult(package: package, status: .noReleases)
+            }
+
+            let latestVersion = normalizeVersion(latestTag.normalized)
+
+            if compareVersions(latestVersion, package.currentVersion) {
+                return PackageUpdateResult(
+                    package: package,
+                    status: .updateAvailable(current: package.currentVersion, latest: latestVersion)
+                )
+            } else {
+                return PackageUpdateResult(
+                    package: package,
+                    status: .upToDate(latestVersion)
+                )
+            }
+
+        } catch {
+            return PackageUpdateResult(
+                package: package,
+                status: .error(error.localizedDescription)
+            )
+        }
+    }
+
+    private func fetchLatestRelease(owner: String, repo: String, package: PackageInfo) async -> PackageUpdateResult {
+        let urlString = "https://api.github.com/repos/\(owner)/\(repo)/releases"
+
+        guard let url = URL(string: urlString) else {
+            return PackageUpdateResult(package: package, status: .error("Invalid API URL"))
+        }
+
+        var request = URLRequest(url: url)
+        request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
+
+        // Add GitHub token if available (for private repos)
+        if let token = githubToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return PackageUpdateResult(package: package, status: .error("Invalid response"))
+            }
+
+            // If releases endpoint returns 404, fall back to tags
+            if httpResponse.statusCode == 404 {
+                return await fetchLatestTag(owner: owner, repo: repo, package: package)
+            }
+
+            guard httpResponse.statusCode == 200 else {
+                return PackageUpdateResult(
+                    package: package,
+                    status: .error("API error (status \(httpResponse.statusCode))")
+                )
+            }
+
             let releases = try JSONDecoder().decode([GitHubRelease].self, from: data)
 
             // Filter out prereleases and find the latest
             let stableReleases = releases.filter { !$0.prerelease }
 
+            // If no releases found, fall back to checking tags
             guard let latestRelease = stableReleases.first else {
-                return PackageUpdateResult(package: package, status: .noReleases)
+                return await fetchLatestTag(owner: owner, repo: repo, package: package)
             }
 
             let latestVersion = normalizeVersion(latestRelease.tagName)
@@ -652,6 +780,10 @@ final class PackageUpdateChecker: Sendable {
         return extractPackagesFromResolved(from: filePath, includeTransitive: includeTransitive)
     }
 
+    public func extractPackagesFromSwiftPackagePublic(from filePath: String) -> [PackageInfo] {
+        return extractPackagesFromSwiftPackage(from: filePath)
+    }
+
     public func compareVersionsPublic(_ latest: String, _ current: String) -> Bool {
         return compareVersions(latest, current)
     }
@@ -662,6 +794,18 @@ final class PackageUpdateChecker: Sendable {
 
     public func extractSourceNamePublic(from path: String) -> String {
         return extractSourceName(from: path)
+    }
+
+    public func normalizeTagNamePublic(_ tag: String) -> String {
+        return normalizeTagName(tag)
+    }
+
+    public func isValidSemverTagPublic(_ tag: String) -> Bool {
+        return isValidSemverTag(tag)
+    }
+
+    public func isPrereleasePublic(_ tag: String) -> Bool {
+        return isPrerelease(tag)
     }
 }
 
