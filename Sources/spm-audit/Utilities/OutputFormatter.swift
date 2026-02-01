@@ -46,7 +46,7 @@ enum OutputFormatter {
         ) + 2
 
         let statusWidth = max(
-            "⚠️  Update available".count,
+            "⚠️  Update available ".count,
             "Status".count
         ) + 2
 
@@ -146,13 +146,13 @@ enum OutputFormatter {
     private static func getLatestAndStatus(_ status: PackageUpdateResult.UpdateStatus) -> (String, String) {
         switch status {
         case .upToDate(let latest):
-            return (latest, "✅ Up to date")
+            return (latest, "✅ Up to date ")
         case .updateAvailable(_, let latest):
-            return (latest, "⚠️  Update available")
+            return (latest, "⚠️  Update available ")
         case .noReleases:
-            return ("N/A", "⚠️  No releases")
+            return ("N/A", "⚠️  No releases ")
         case .error:
-            return ("N/A", "❌ Error")
+            return ("N/A", "❌ Error ")
         }
     }
 
