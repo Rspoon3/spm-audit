@@ -58,9 +58,15 @@ final class PackageUpdateChecker: Sendable {
         }
 
         // Print results grouped by source
-        for (filePath, packageResults) in groupedResults.sorted(by: { $0.key < $1.key }) {
+        let sortedGroups = groupedResults.sorted(by: { $0.key < $1.key })
+        for (index, (filePath, packageResults)) in sortedGroups.enumerated() {
             let sortedResults = packageResults.sorted { $0.package.name < $1.package.name }
             OutputFormatter.printTable(sortedResults, source: filePath)
+
+            // Add spacing after summary if not last
+            if index < sortedGroups.count - 1 {
+                print("\n\n")
+            }
         }
     }
 
