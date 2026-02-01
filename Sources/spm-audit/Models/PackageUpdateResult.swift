@@ -66,8 +66,8 @@ struct PackageUpdateResult {
             case .wtfpl: return "WTFPL"
             case .zlib: return "Zlib"
             case .other(let name): return name
-            case .missing: return "No License"
-            case .unknown: return "Unknown"
+            case .missing: return "N/A"
+            case .unknown: return "N/A"
             }
         }
     }
