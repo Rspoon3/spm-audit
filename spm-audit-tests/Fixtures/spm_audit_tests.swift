@@ -352,6 +352,145 @@ struct VersionTests {
     }
 }
 
+struct GitURLHandlingTests {
+
+    @Test("Strip .git suffix from package names")
+    func testStripGitSuffixFromPackageNames() async throws {
+        let checker = PackageUpdateChecker()
+
+        // Create a temporary Package.swift with .git suffix in URL
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+
+        let packageSwiftPath = tempDir.appendingPathComponent("Package.swift")
+        let packageContent = """
+        // swift-tools-version: 5.9
+        import PackageDescription
+
+        let package = Package(
+            name: "TestPackage",
+            dependencies: [
+                .package(url: "https://github.com/airbnb/lottie-ios.git", exact: "4.5.0")
+            ]
+        )
+        """
+        try packageContent.write(to: URL(fileURLWithPath: packageSwiftPath.path), atomically: true, encoding: .utf8)
+
+        // Extract packages
+        let packages = checker.extractPackagesFromSwiftPackagePublic(from: packageSwiftPath.path)
+
+        #expect(!packages.isEmpty, "Should find packages")
+
+        // Verify the .git suffix is stripped from the package name
+        let lottiePackage = packages.first { $0.name == "lottie-ios" }
+        #expect(lottiePackage != nil, "Should find lottie-ios package")
+        #expect(lottiePackage?.name == "lottie-ios", "Package name should not include .git suffix")
+        #expect(!lottiePackage!.name.hasSuffix(".git"), "Package name should not end with .git")
+
+        // Cleanup
+        try? FileManager.default.removeItem(at: tempDir)
+    }
+
+    @Test("GitHub API calls strip .git suffix from repo name")
+    func testGitHubAPIStripsGitSuffix() async throws {
+        // This test verifies that the repo name extraction from URLs with .git suffix
+        // correctly strips the suffix before making API calls
+
+        let testURLs = [
+            ("https://github.com/airbnb/lottie-ios.git", "airbnb", "lottie-ios"),
+            ("https://github.com/apple/swift-algorithms.git", "apple", "swift-algorithms"),
+            ("https://github.com/pointfreeco/swift-composable-architecture", "pointfreeco", "swift-composable-architecture")
+        ]
+
+        for (url, expectedOwner, expectedRepo) in testURLs {
+            let components = url.components(separatedBy: "/")
+            guard let ownerIndex = components.firstIndex(of: "github.com"),
+                  ownerIndex + 2 < components.count else {
+                #expect(Bool(false), "Failed to parse URL: \(url)")
+                continue
+            }
+
+            let owner = components[ownerIndex + 1]
+            let repoWithGit = components[ownerIndex + 2]
+            let repo = repoWithGit.replacingOccurrences(of: ".git", with: "")
+
+            #expect(owner == expectedOwner, "Owner should be \(expectedOwner) for \(url)")
+            #expect(repo == expectedRepo, "Repo should be \(expectedRepo) for \(url)")
+            #expect(!repo.hasSuffix(".git"), "Repo name should not end with .git for \(url)")
+        }
+    }
+}
+
+struct TagNormalizationTests {
+
+    @Test("Normalize tag names with common prefixes")
+    func testTagNameNormalization() async throws {
+        let checker = PackageUpdateChecker()
+
+        // Test v prefix
+        #expect(checker.normalizeTagNamePublic("v1.0.0") == "1.0.0")
+        #expect(checker.normalizeTagNamePublic("V1.0.0") == "1.0.0")
+
+        // Test package name prefix
+        #expect(checker.normalizeTagNamePublic("wire-3.0.1") == "3.0.1")
+        #expect(checker.normalizeTagNamePublic("lottie-4.5.0") == "4.5.0")
+
+        // Test no prefix
+        #expect(checker.normalizeTagNamePublic("5.5.0") == "5.5.0")
+
+        // Test release/ prefix
+        #expect(checker.normalizeTagNamePublic("release/1.0.0") == "1.0.0")
+    }
+
+    @Test("Identify valid semver tags")
+    func testValidSemverTags() async throws {
+        let checker = PackageUpdateChecker()
+
+        // Valid tags
+        #expect(checker.isValidSemverTagPublic("1.0.0") == true)
+        #expect(checker.isValidSemverTagPublic("v2.3.4") == true)
+        #expect(checker.isValidSemverTagPublic("wire-3.0.1") == true)
+        #expect(checker.isValidSemverTagPublic("5.5.0") == true)
+
+        // Invalid tags
+        #expect(checker.isValidSemverTagPublic("main") == false)
+        #expect(checker.isValidSemverTagPublic("develop") == false)
+        #expect(checker.isValidSemverTagPublic("swift53") == false)
+        #expect(checker.isValidSemverTagPublic("v1") == false)
+    }
+
+    @Test("Identify prerelease tags")
+    func testPrereleaseIdentification() async throws {
+        let checker = PackageUpdateChecker()
+
+        // Prerelease tags
+        #expect(checker.isPrereleasePublic("1.0.0-alpha") == true)
+        #expect(checker.isPrereleasePublic("1.0.0-beta.1") == true)
+        #expect(checker.isPrereleasePublic("2.0.0-RC1") == true)
+        #expect(checker.isPrereleasePublic("1.0.0-dev") == true)
+        #expect(checker.isPrereleasePublic("1.0.0.alpha1") == true)
+
+        // Stable tags
+        #expect(checker.isPrereleasePublic("1.0.0") == false)
+        #expect(checker.isPrereleasePublic("v2.3.4") == false)
+    }
+
+    @Test("Sort tags by semantic version")
+    func testTagSorting() async throws {
+        let checker = PackageUpdateChecker()
+
+        let tags = ["1.0.0", "2.0.0", "1.5.0", "1.0.1"]
+        let sorted = tags.sorted { tag1, tag2 in
+            let v1 = checker.normalizeVersionPublic(tag1)
+            let v2 = checker.normalizeVersionPublic(tag2)
+            return checker.compareVersionsPublic(v1, v2)
+        }
+
+        #expect(sorted.first == "2.0.0", "Latest version should be first")
+        #expect(sorted.last == "1.0.0", "Oldest version should be last")
+    }
+}
+
 // Expose internal methods for testing
 extension PackageUpdater {
     func isValidVersionPublic(_ version: String) -> Bool {
