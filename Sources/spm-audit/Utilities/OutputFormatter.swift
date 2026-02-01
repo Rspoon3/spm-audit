@@ -74,6 +74,16 @@ enum OutputFormatter {
 
         print(separator)
 
+        // Print README and License status for each dependency
+        if !results.isEmpty {
+            print("\n📄 Dependency README & License:\n")
+            for result in results {
+                let readmeInd = getReadmeIndicator(result.readmeStatus)
+                let licenseInd = getLicenseIndicator(result.licenseType)
+                print("  \(result.package.name): \(readmeInd) README | \(licenseInd) \(result.licenseType.displayName)")
+            }
+        }
+
         // Print project/package README status
         let readmeIndicator = getReadmeIndicator(readmeStatus)
         let readmeText = getReadmeText(readmeStatus)

@@ -114,7 +114,8 @@ final class PackageUpdateChecker: Sendable {
             return PackageUpdateResult(
                 package: package,
                 status: .error("Could not parse GitHub URL"),
-                readmeStatus: .unknown
+                readmeStatus: .unknown,
+                licenseType: .unknown
             )
         }
 
@@ -125,11 +126,17 @@ final class PackageUpdateChecker: Sendable {
 
         let result = await githubClient.fetchLatestRelease(owner: owner, repo: repo, package: package)
 
-        // Return result with unknown README status (will be checked at project level)
+        // Check README and license in the dependency's checkout directory
+        let checkoutPath = (workingDirectory as NSString).appendingPathComponent(".build/checkouts/\(package.name)")
+        let readmeStatus = checkDependencyReadme(in: checkoutPath)
+        let licenseType = checkDependencyLicense(in: checkoutPath)
+
+        // Return result with dependency's README and license status
         return PackageUpdateResult(
             package: result.package,
             status: result.status,
-            readmeStatus: .unknown
+            readmeStatus: readmeStatus,
+            licenseType: licenseType
         )
     }
 
@@ -176,6 +183,37 @@ final class PackageUpdateChecker: Sendable {
         let directory = getDirectoryPath(for: filePath)
         let readmePath = (directory as NSString).appendingPathComponent("README.md")
         return fileManager.fileExists(atPath: readmePath) ? .present : .missing
+    }
+
+    private func checkDependencyReadme(in checkoutPath: String) -> PackageUpdateResult.ReadmeStatus {
+        // Check if the checkout directory exists
+        guard fileManager.fileExists(atPath: checkoutPath) else {
+            return .unknown
+        }
+
+        let readmePath = (checkoutPath as NSString).appendingPathComponent("README.md")
+        return fileManager.fileExists(atPath: readmePath) ? .present : .missing
+    }
+
+    private func checkDependencyLicense(in checkoutPath: String) -> PackageUpdateResult.LicenseType {
+        // Check if the checkout directory exists
+        guard fileManager.fileExists(atPath: checkoutPath) else {
+            return .unknown
+        }
+
+        // Common license file names
+        let licenseFileNames = ["LICENSE", "LICENSE.txt", "LICENSE.md", "COPYING", "COPYING.txt", "LICENSE-MIT", "LICENSE-APACHE"]
+
+        // Find the first license file that exists
+        for fileName in licenseFileNames {
+            let licensePath = (checkoutPath as NSString).appendingPathComponent(fileName)
+            if fileManager.fileExists(atPath: licensePath),
+               let content = try? String(contentsOfFile: licensePath, encoding: .utf8) {
+                return detectLicenseType(from: content)
+            }
+        }
+
+        return .missing
     }
 
     private func checkLicenseInDirectory(for filePath: String) -> PackageUpdateResult.LicenseType {

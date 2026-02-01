@@ -51,7 +51,7 @@ final class GitHubClient: Sendable {
         let urlString = "https://api.github.com/repos/\(owner)/\(repo)/releases"
 
         guard let url = URL(string: urlString) else {
-            return PackageUpdateResult(package: package, status: .error("Invalid API URL"), readmeStatus: .unknown)
+            return PackageUpdateResult(package: package, status: .error("Invalid API URL"), readmeStatus: .unknown, licenseType: .unknown)
         }
 
         var request = URLRequest(url: url)
@@ -66,7 +66,7 @@ final class GitHubClient: Sendable {
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                return PackageUpdateResult(package: package, status: .error("Invalid response"), readmeStatus: .unknown)
+                return PackageUpdateResult(package: package, status: .error("Invalid response"), readmeStatus: .unknown, licenseType: .unknown)
             }
 
             // If releases endpoint returns 404, fall back to tags
@@ -78,7 +78,8 @@ final class GitHubClient: Sendable {
                 return PackageUpdateResult(
                     package: package,
                     status: .error("API error (status \(httpResponse.statusCode))"),
-                    readmeStatus: .unknown
+                    readmeStatus: .unknown,
+                    licenseType: .unknown
                 )
             }
 
@@ -98,13 +99,15 @@ final class GitHubClient: Sendable {
                 return PackageUpdateResult(
                     package: package,
                     status: .updateAvailable(current: package.currentVersion, latest: latestVersion),
-                    readmeStatus: .unknown
+                    readmeStatus: .unknown,
+                    licenseType: .unknown
                 )
             } else {
                 return PackageUpdateResult(
                     package: package,
                     status: .upToDate(latestVersion),
-                    readmeStatus: .unknown
+                    readmeStatus: .unknown,
+                    licenseType: .unknown
                 )
             }
 
@@ -112,7 +115,8 @@ final class GitHubClient: Sendable {
             return PackageUpdateResult(
                 package: package,
                 status: .error(error.localizedDescription),
-                readmeStatus: .unknown
+                readmeStatus: .unknown,
+                licenseType: .unknown
             )
         }
     }
@@ -122,7 +126,7 @@ final class GitHubClient: Sendable {
         let urlString = "https://api.github.com/repos/\(owner)/\(repo)/tags?per_page=100"
 
         guard let url = URL(string: urlString) else {
-            return PackageUpdateResult(package: package, status: .error("Invalid API URL"), readmeStatus: .unknown)
+            return PackageUpdateResult(package: package, status: .error("Invalid API URL"), readmeStatus: .unknown, licenseType: .unknown)
         }
 
         var request = URLRequest(url: url)
@@ -136,18 +140,19 @@ final class GitHubClient: Sendable {
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                return PackageUpdateResult(package: package, status: .error("Invalid response"), readmeStatus: .unknown)
+                return PackageUpdateResult(package: package, status: .error("Invalid response"), readmeStatus: .unknown, licenseType: .unknown)
             }
 
             if httpResponse.statusCode == 404 {
-                return PackageUpdateResult(package: package, status: .noReleases, readmeStatus: .unknown)
+                return PackageUpdateResult(package: package, status: .noReleases, readmeStatus: .unknown, licenseType: .unknown)
             }
 
             guard httpResponse.statusCode == 200 else {
                 return PackageUpdateResult(
                     package: package,
                     status: .error("API error (status \(httpResponse.statusCode))"),
-                    readmeStatus: .unknown
+                    readmeStatus: .unknown,
+                    licenseType: .unknown
                 )
             }
 
@@ -167,7 +172,7 @@ final class GitHubClient: Sendable {
                 }
 
             guard let latestTag = validTags.first else {
-                return PackageUpdateResult(package: package, status: .noReleases, readmeStatus: .unknown)
+                return PackageUpdateResult(package: package, status: .noReleases, readmeStatus: .unknown, licenseType: .unknown)
             }
 
             let latestVersion = VersionHelpers.normalize(latestTag.normalized)
@@ -176,13 +181,15 @@ final class GitHubClient: Sendable {
                 return PackageUpdateResult(
                     package: package,
                     status: .updateAvailable(current: package.currentVersion, latest: latestVersion),
-                    readmeStatus: .unknown
+                    readmeStatus: .unknown,
+                    licenseType: .unknown
                 )
             } else {
                 return PackageUpdateResult(
                     package: package,
                     status: .upToDate(latestVersion),
-                    readmeStatus: .unknown
+                    readmeStatus: .unknown,
+                    licenseType: .unknown
                 )
             }
 
@@ -190,7 +197,8 @@ final class GitHubClient: Sendable {
             return PackageUpdateResult(
                 package: package,
                 status: .error(error.localizedDescription),
-                readmeStatus: .unknown
+                readmeStatus: .unknown,
+                licenseType: .unknown
             )
         }
     }
