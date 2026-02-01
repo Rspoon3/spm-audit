@@ -125,16 +125,35 @@ final class PackageUpdateChecker: Sendable {
             return
         }
 
-        print("\n\n📦 Local Packages:\n")
+        // Convert local packages to PackageUpdateResult objects for table display
+        var results: [PackageUpdateResult] = []
         for package in localPackages {
-            // Check README and License for each local package
             let readmeStatus = checkReadmeInDirectory(for: package.path)
             let licenseType = checkLicenseInDirectory(for: package.path)
-            let readmeInd = getReadmeIndicator(readmeStatus)
-            let licenseInd = getLicenseIndicator(licenseType)
-            let swiftVersion = package.swiftVersion ?? "N/A"
-            print("  \(package.name): \(readmeInd) README | \(licenseInd) \(licenseType.displayName) | Swift \(swiftVersion)")
+
+            // Create a PackageInfo for the local package
+            let packageInfo = PackageInfo(
+                name: package.name,
+                url: "local://\(package.name)", // Local packages don't have URLs
+                currentVersion: "N/A",
+                filePath: package.path,
+                requirementType: nil,
+                swiftVersion: package.swiftVersion
+            )
+
+            // Create a result with N/A status (local packages aren't checked for updates)
+            let result = PackageUpdateResult(
+                package: packageInfo,
+                status: .upToDate("N/A"), // No version tracking for local packages
+                readmeStatus: readmeStatus,
+                licenseType: licenseType
+            )
+
+            results.append(result)
         }
+
+        print("\n\n")
+        OutputFormatter.printTable(results, source: "Local Packages")
     }
 
     private func findPackages() -> [PackageInfo] {
