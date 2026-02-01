@@ -512,21 +512,27 @@ struct ReadmeStatusTests {
             package: package,
             status: .upToDate("1.0.0"),
             readmeStatus: .present,
-            licenseType: .mit
+            licenseType: .mit,
+            claudeFileStatus: .unknown,
+            agentsFileStatus: .unknown
         )
 
         let missingResult = PackageUpdateResult(
             package: package,
             status: .upToDate("1.0.0"),
             readmeStatus: .missing,
-            licenseType: .missing
+            licenseType: .missing,
+            claudeFileStatus: .unknown,
+            agentsFileStatus: .unknown
         )
 
         let unknownResult = PackageUpdateResult(
             package: package,
             status: .upToDate("1.0.0"),
             readmeStatus: .unknown,
-            licenseType: .unknown
+            licenseType: .unknown,
+            claudeFileStatus: .unknown,
+            agentsFileStatus: .unknown
         )
 
         #expect(presentResult.readmeStatus == .present)
@@ -572,7 +578,9 @@ struct ReadmeStatusTests {
             package: package,
             status: .updateAvailable(current: "1.0.0", latest: "1.2.0"),
             readmeStatus: .present,
-            licenseType: .apache
+            licenseType: .apache,
+            claudeFileStatus: .unknown,
+            agentsFileStatus: .unknown
         )
 
         #expect(result.readmeStatus == .present)

@@ -12,6 +12,8 @@ struct PackageUpdateResult {
     let status: UpdateStatus
     let readmeStatus: ReadmeStatus
     let licenseType: LicenseType
+    let claudeFileStatus: FileStatus
+    let agentsFileStatus: FileStatus
 
     enum UpdateStatus {
         case upToDate(String)
@@ -21,6 +23,12 @@ struct PackageUpdateResult {
     }
 
     enum ReadmeStatus {
+        case present
+        case missing
+        case unknown
+    }
+
+    enum FileStatus {
         case present
         case missing
         case unknown

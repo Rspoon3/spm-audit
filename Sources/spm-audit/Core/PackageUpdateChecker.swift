@@ -25,8 +25,12 @@ final class PackageUpdateChecker: Sendable {
         // Check and display project README and License status ONCE at the start
         let projectReadmeStatus = checkReadmeInDirectory(for: workingDirectory)
         let projectLicenseType = checkLicenseInDirectory(for: workingDirectory)
+        let projectClaudeFileStatus = checkClaudeFileInDirectory(for: workingDirectory)
+        let projectAgentsFileStatus = checkAgentsFileInDirectory(for: workingDirectory)
         print("📄 Project README: \(getReadmeIndicator(projectReadmeStatus)) \(getReadmeText(projectReadmeStatus))")
-        print("⚖️  Project License: \(getLicenseIndicator(projectLicenseType)) \(projectLicenseType.displayName)\n")
+        print("⚖️  Project License: \(getLicenseIndicator(projectLicenseType)) \(projectLicenseType.displayName)")
+        print("🤖 Project CLAUDE.md: \(getFileIndicator(projectClaudeFileStatus)) \(getFileText(projectClaudeFileStatus, fileName: "CLAUDE.md"))")
+        print("🤖 Project AGENTS.md: \(getFileIndicator(projectAgentsFileStatus)) \(getFileText(projectAgentsFileStatus, fileName: "AGENTS.md"))\n")
 
         let packages = findPackages()
 
@@ -130,6 +134,8 @@ final class PackageUpdateChecker: Sendable {
         for package in localPackages {
             let readmeStatus = checkReadmeInDirectory(for: package.path)
             let licenseType = checkLicenseInDirectory(for: package.path)
+            let claudeFileStatus = checkClaudeFileInDirectory(for: package.path)
+            let agentsFileStatus = checkAgentsFileInDirectory(for: package.path)
 
             // Create a PackageInfo for the local package
             let packageInfo = PackageInfo(
@@ -146,7 +152,9 @@ final class PackageUpdateChecker: Sendable {
                 package: packageInfo,
                 status: .upToDate("N/A"), // No version tracking for local packages
                 readmeStatus: readmeStatus,
-                licenseType: licenseType
+                licenseType: licenseType,
+                claudeFileStatus: claudeFileStatus,
+                agentsFileStatus: agentsFileStatus
             )
 
             results.append(result)
@@ -255,7 +263,9 @@ final class PackageUpdateChecker: Sendable {
                 package: package,
                 status: .error("Could not parse GitHub URL"),
                 readmeStatus: .unknown,
-                licenseType: .unknown
+                licenseType: .unknown,
+                claudeFileStatus: .unknown,
+                agentsFileStatus: .unknown
             )
         }
 
@@ -266,11 +276,13 @@ final class PackageUpdateChecker: Sendable {
 
         let result = await githubClient.fetchLatestRelease(owner: owner, repo: repo, package: package)
 
-        // Check README, license, and Swift version in the dependency's checkout directory
+        // Check README, license, CLAUDE.md, AGENTS.md, and Swift version in the dependency's checkout directory
         // This works for both SPM projects and Xcode projects (DerivedData)
         let checkoutPath = findCheckoutPath(for: package.name)
         let readmeStatus = checkoutPath.map { checkDependencyReadme(in: $0) } ?? .unknown
         let licenseType = checkoutPath.map { checkDependencyLicense(in: $0) } ?? .unknown
+        let claudeFileStatus = checkoutPath.map { checkDependencyClaudeFile(in: $0) } ?? .unknown
+        let agentsFileStatus = checkoutPath.map { checkDependencyAgentsFile(in: $0) } ?? .unknown
         let swiftVersion = checkoutPath.flatMap { extractSwiftVersion(from: $0) }
 
         // Create updated package with Swift version
@@ -283,12 +295,14 @@ final class PackageUpdateChecker: Sendable {
             swiftVersion: swiftVersion
         )
 
-        // Return result with dependency's README, license status, and Swift version
+        // Return result with dependency's README, license, CLAUDE.md, AGENTS.md status, and Swift version
         return PackageUpdateResult(
             package: updatedPackage,
             status: result.status,
             readmeStatus: readmeStatus,
-            licenseType: licenseType
+            licenseType: licenseType,
+            claudeFileStatus: claudeFileStatus,
+            agentsFileStatus: agentsFileStatus
         )
     }
 
@@ -311,6 +325,28 @@ final class PackageUpdateChecker: Sendable {
             return "Missing README"
         case .unknown:
             return "README status unknown"
+        }
+    }
+
+    private func getFileIndicator(_ fileStatus: PackageUpdateResult.FileStatus) -> String {
+        switch fileStatus {
+        case .present:
+            return "✅"
+        case .missing:
+            return "❌"
+        case .unknown:
+            return "❓"
+        }
+    }
+
+    private func getFileText(_ fileStatus: PackageUpdateResult.FileStatus, fileName: String) -> String {
+        switch fileStatus {
+        case .present:
+            return "Has \(fileName)"
+        case .missing:
+            return "Missing \(fileName)"
+        case .unknown:
+            return "\(fileName) status unknown"
         }
     }
 
@@ -337,6 +373,18 @@ final class PackageUpdateChecker: Sendable {
         return fileManager.fileExists(atPath: readmePath) ? .present : .missing
     }
 
+    private func checkClaudeFileInDirectory(for filePath: String) -> PackageUpdateResult.FileStatus {
+        let directory = getDirectoryPath(for: filePath)
+        let claudePath = (directory as NSString).appendingPathComponent("CLAUDE.md")
+        return fileManager.fileExists(atPath: claudePath) ? .present : .missing
+    }
+
+    private func checkAgentsFileInDirectory(for filePath: String) -> PackageUpdateResult.FileStatus {
+        let directory = getDirectoryPath(for: filePath)
+        let agentsPath = (directory as NSString).appendingPathComponent("AGENTS.md")
+        return fileManager.fileExists(atPath: agentsPath) ? .present : .missing
+    }
+
     private func checkDependencyReadme(in checkoutPath: String) -> PackageUpdateResult.ReadmeStatus {
         // Check if the checkout directory exists
         guard fileManager.fileExists(atPath: checkoutPath) else {
@@ -345,6 +393,26 @@ final class PackageUpdateChecker: Sendable {
 
         let readmePath = (checkoutPath as NSString).appendingPathComponent("README.md")
         return fileManager.fileExists(atPath: readmePath) ? .present : .missing
+    }
+
+    private func checkDependencyClaudeFile(in checkoutPath: String) -> PackageUpdateResult.FileStatus {
+        // Check if the checkout directory exists
+        guard fileManager.fileExists(atPath: checkoutPath) else {
+            return .unknown
+        }
+
+        let claudePath = (checkoutPath as NSString).appendingPathComponent("CLAUDE.md")
+        return fileManager.fileExists(atPath: claudePath) ? .present : .missing
+    }
+
+    private func checkDependencyAgentsFile(in checkoutPath: String) -> PackageUpdateResult.FileStatus {
+        // Check if the checkout directory exists
+        guard fileManager.fileExists(atPath: checkoutPath) else {
+            return .unknown
+        }
+
+        let agentsPath = (checkoutPath as NSString).appendingPathComponent("AGENTS.md")
+        return fileManager.fileExists(atPath: agentsPath) ? .present : .missing
     }
 
     private func checkDependencyLicense(in checkoutPath: String) -> PackageUpdateResult.LicenseType {

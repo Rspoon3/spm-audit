@@ -57,6 +57,9 @@ enum OutputFormatter {
             "License".count
         ) + 2
 
+        let claudeWidth = 10 // "CLAUDE.md" or icons
+        let agentsWidth = 10 // "AGENTS.md" or icons
+
         // Print header
         let separator = "+" + String(repeating: "-", count: nameWidth) +
                        "+" + String(repeating: "-", count: typeWidth) +
@@ -65,7 +68,9 @@ enum OutputFormatter {
                        "+" + String(repeating: "-", count: latestWidth) +
                        "+" + String(repeating: "-", count: statusWidth) +
                        "+" + String(repeating: "-", count: readmeWidth) +
-                       "+" + String(repeating: "-", count: licenseWidth) + "+"
+                       "+" + String(repeating: "-", count: licenseWidth) +
+                       "+" + String(repeating: "-", count: claudeWidth) +
+                       "+" + String(repeating: "-", count: agentsWidth) + "+"
 
         print(separator)
         print("| \(pad("Package", width: nameWidth - 2))" +
@@ -75,7 +80,9 @@ enum OutputFormatter {
               " | \(pad("Latest", width: latestWidth - 2))" +
               " | \(pad("Status", width: statusWidth - 2))" +
               " | \(pad("README", width: readmeWidth - 2))" +
-              " | \(pad("License", width: licenseWidth - 2)) |")
+              " | \(pad("License", width: licenseWidth - 2))" +
+              " | \(pad("CLAUDE.md", width: claudeWidth - 2))" +
+              " | \(pad("AGENTS.md", width: agentsWidth - 2)) |")
         print(separator)
 
         // Print rows
@@ -86,6 +93,8 @@ enum OutputFormatter {
             let swift = result.package.swiftVersion ?? "N/A"
             let readme = getReadmeIndicator(result.readmeStatus)
             let license = result.licenseType.displayName
+            let claude = getFileIndicator(result.claudeFileStatus)
+            let agents = getFileIndicator(result.agentsFileStatus)
 
             let (latest, status) = getLatestAndStatus(result.status)
 
@@ -96,7 +105,9 @@ enum OutputFormatter {
                   " | \(pad(latest, width: latestWidth - 2))" +
                   " | \(pad(status, width: statusWidth - 2))" +
                   " | \(pad(readme, width: readmeWidth - 2))" +
-                  " | \(pad(license, width: licenseWidth - 2)) |")
+                  " | \(pad(license, width: licenseWidth - 2))" +
+                  " | \(pad(claude, width: claudeWidth - 2))" +
+                  " | \(pad(agents, width: agentsWidth - 2)) |")
         }
 
         print(separator)
@@ -175,6 +186,17 @@ enum OutputFormatter {
             return "Missing README"
         case .unknown:
             return "README status unknown"
+        }
+    }
+
+    private static func getFileIndicator(_ fileStatus: PackageUpdateResult.FileStatus) -> String {
+        switch fileStatus {
+        case .present:
+            return "✅"
+        case .missing:
+            return "❌"
+        case .unknown:
+            return "❓"
         }
     }
 
