@@ -47,13 +47,22 @@ enum OutputFormatter {
 
         let statusWidth = 20
 
+        let readmeWidth = 8 // "README" or icons
+
+        let licenseWidth = max(
+            results.map { $0.licenseType.displayName.count }.max() ?? 0,
+            "License".count
+        ) + 2
+
         // Print header
         let separator = "+" + String(repeating: "-", count: nameWidth) +
                        "+" + String(repeating: "-", count: typeWidth) +
                        "+" + String(repeating: "-", count: currentWidth) +
                        "+" + String(repeating: "-", count: swiftWidth) +
                        "+" + String(repeating: "-", count: latestWidth) +
-                       "+" + String(repeating: "-", count: statusWidth) + "+"
+                       "+" + String(repeating: "-", count: statusWidth) +
+                       "+" + String(repeating: "-", count: readmeWidth) +
+                       "+" + String(repeating: "-", count: licenseWidth) + "+"
 
         print(separator)
         print("| \(pad("Package", width: nameWidth - 2))" +
@@ -61,7 +70,9 @@ enum OutputFormatter {
               " | \(pad("Current", width: currentWidth - 2))" +
               " | \(pad("Swift", width: swiftWidth - 2))" +
               " | \(pad("Latest", width: latestWidth - 2))" +
-              " | \(pad("Status", width: statusWidth - 2)) |")
+              " | \(pad("Status", width: statusWidth - 2))" +
+              " | \(pad("README", width: readmeWidth - 2))" +
+              " | \(pad("License", width: licenseWidth - 2)) |")
         print(separator)
 
         // Print rows
@@ -70,6 +81,8 @@ enum OutputFormatter {
             let type = result.package.requirementType?.displayName ?? "Unknown"
             let current = result.package.currentVersion
             let swift = result.package.swiftVersion ?? "N/A"
+            let readme = getReadmeIndicator(result.readmeStatus)
+            let license = result.licenseType.displayName
 
             let (latest, status) = getLatestAndStatus(result.status)
 
@@ -78,21 +91,12 @@ enum OutputFormatter {
                   " | \(pad(current, width: currentWidth - 2))" +
                   " | \(pad(swift, width: swiftWidth - 2))" +
                   " | \(pad(latest, width: latestWidth - 2))" +
-                  " | \(pad(status, width: statusWidth - 2)) |")
+                  " | \(pad(status, width: statusWidth - 2))" +
+                  " | \(pad(readme, width: readmeWidth - 2))" +
+                  " | \(pad(license, width: licenseWidth - 2)) |")
         }
 
         print(separator)
-
-        // Print README, License, and Swift version for each dependency
-        if !results.isEmpty {
-            print("\n📄 Package Details:\n")
-            for result in results {
-                let readmeInd = getReadmeIndicator(result.readmeStatus)
-                let licenseInd = getLicenseIndicator(result.licenseType)
-                let swiftVersion = result.package.swiftVersion ?? "N/A"
-                print("  \(result.package.name): \(readmeInd) README | \(licenseInd) \(result.licenseType.displayName) | Swift \(swiftVersion)")
-            }
-        }
 
         // Print project/package README status
         let readmeIndicator = getReadmeIndicator(readmeStatus)
