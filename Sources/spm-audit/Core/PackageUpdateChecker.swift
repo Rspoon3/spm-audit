@@ -123,10 +123,15 @@ final class PackageUpdateChecker: Sendable {
             return
         }
 
-        print("\n🔧 Local Package Swift Versions:")
+        print("\n📦 Local Package Details:\n")
         for package in localPackages {
-            let version = package.swiftVersion ?? "N/A"
-            print("   \(package.name): \(version)")
+            // Check README and License for each local package
+            let readmeStatus = checkReadmeInDirectory(for: package.path)
+            let licenseType = checkLicenseInDirectory(for: package.path)
+            let readmeInd = getReadmeIndicator(readmeStatus)
+            let licenseInd = getLicenseIndicator(licenseType)
+            let swiftVersion = package.swiftVersion ?? "N/A"
+            print("  \(package.name): \(readmeInd) README | \(licenseInd) \(licenseType.displayName) | Swift \(swiftVersion)")
         }
     }
 

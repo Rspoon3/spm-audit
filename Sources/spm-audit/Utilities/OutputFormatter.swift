@@ -83,13 +83,14 @@ enum OutputFormatter {
 
         print(separator)
 
-        // Print README and License status for each dependency
+        // Print README, License, and Swift version for each dependency
         if !results.isEmpty {
-            print("\n📄 Dependency README & License:\n")
+            print("\n📄 Package Details:\n")
             for result in results {
                 let readmeInd = getReadmeIndicator(result.readmeStatus)
                 let licenseInd = getLicenseIndicator(result.licenseType)
-                print("  \(result.package.name): \(readmeInd) README | \(licenseInd) \(result.licenseType.displayName)")
+                let swiftVersion = result.package.swiftVersion ?? "N/A"
+                print("  \(result.package.name): \(readmeInd) README | \(licenseInd) \(result.licenseType.displayName) | Swift \(swiftVersion)")
             }
         }
 
