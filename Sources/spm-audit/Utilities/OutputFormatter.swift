@@ -9,7 +9,7 @@ import Foundation
 
 enum OutputFormatter {
     /// Print a formatted table of package update results
-    static func printTable(_ results: [PackageUpdateResult], source: String, readmeStatus: PackageUpdateResult.ReadmeStatus, licenseType: PackageUpdateResult.LicenseType) {
+    static func printTable(_ results: [PackageUpdateResult], source: String) {
         // Print source header
         let sourceName = extractSourceName(from: source)
         print("\n📋 \(sourceName)")
@@ -97,15 +97,6 @@ enum OutputFormatter {
         }
 
         print(separator)
-
-        // Print project/package README status
-        let readmeIndicator = getReadmeIndicator(readmeStatus)
-        let readmeText = getReadmeText(readmeStatus)
-        print("\n📄 Project README: \(readmeIndicator) \(readmeText)")
-
-        // Print project/package License status
-        let licenseIndicator = getLicenseIndicator(licenseType)
-        print("⚖️  Project License: \(licenseIndicator) \(licenseType.displayName)")
 
         // Print summary
         let updateCount = results.filter {

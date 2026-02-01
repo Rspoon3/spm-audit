@@ -22,19 +22,16 @@ final class PackageUpdateChecker: Sendable {
     func run() async {
         print("🔍 Auditing project...\n")
 
+        // Check and display project README and License status ONCE at the start
+        let projectReadmeStatus = checkReadmeInDirectory(for: workingDirectory)
+        let projectLicenseType = checkLicenseInDirectory(for: workingDirectory)
+        print("📄 Project README: \(getReadmeIndicator(projectReadmeStatus)) \(getReadmeText(projectReadmeStatus))")
+        print("⚖️  Project License: \(getLicenseIndicator(projectLicenseType)) \(projectLicenseType.displayName)\n")
+
         let packages = findPackages()
 
         if packages.isEmpty {
             print("⚠️  No packages with exact versions found.")
-
-            // Still check and display README and License status for root project only
-            // Check in the working directory (root project)
-            let readmeStatus = checkReadmeInDirectory(for: workingDirectory)
-            let licenseType = checkLicenseInDirectory(for: workingDirectory)
-
-            print("\n📄 Project README: \(getReadmeIndicator(readmeStatus)) \(getReadmeText(readmeStatus))")
-            print("⚖️  Project License: \(getLicenseIndicator(licenseType)) \(licenseType.displayName)")
-
             return
         }
 
@@ -63,9 +60,7 @@ final class PackageUpdateChecker: Sendable {
         // Print results grouped by source
         for (filePath, packageResults) in groupedResults.sorted(by: { $0.key < $1.key }) {
             let sortedResults = packageResults.sorted { $0.package.name < $1.package.name }
-            let readmeStatus = checkReadmeInDirectory(for: filePath)
-            let licenseType = checkLicenseInDirectory(for: filePath)
-            OutputFormatter.printTable(sortedResults, source: filePath, readmeStatus: readmeStatus, licenseType: licenseType)
+            OutputFormatter.printTable(sortedResults, source: filePath)
         }
     }
 
