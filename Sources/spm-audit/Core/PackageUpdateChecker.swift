@@ -22,32 +22,19 @@ final class PackageUpdateChecker: Sendable {
     func run() async {
         print("🔍 Auditing project...\n")
 
-        // Find all package files (even if they don't have auditable packages)
-        let packageFiles = findPackageFiles()
         let packages = findPackages()
 
         if packages.isEmpty {
             print("⚠️  No packages with exact versions found.")
 
-            // Still check and display README and License status for discovered files
-            if !packageFiles.isEmpty {
-                print("\n📄 README Status:\n")
-                for filePath in packageFiles.sorted() {
-                    let readmeStatus = checkReadmeInDirectory(for: filePath)
-                    let sourceName = OutputFormatter.extractSourceNamePublic(from: filePath)
-                    let indicator = getReadmeIndicator(readmeStatus)
-                    let text = getReadmeText(readmeStatus)
-                    print("  \(indicator) \(sourceName): \(text)")
-                }
+            // Still check and display README and License status for root project only
+            // Check in the working directory (root project)
+            let readmeStatus = checkReadmeInDirectory(for: workingDirectory)
+            let licenseType = checkLicenseInDirectory(for: workingDirectory)
 
-                print("\n⚖️  License Status:\n")
-                for filePath in packageFiles.sorted() {
-                    let licenseType = checkLicenseInDirectory(for: filePath)
-                    let sourceName = OutputFormatter.extractSourceNamePublic(from: filePath)
-                    let indicator = getLicenseIndicator(licenseType)
-                    print("  \(indicator) \(sourceName): \(licenseType.displayName)")
-                }
-            }
+            print("\n📄 Project README: \(getReadmeIndicator(readmeStatus)) \(getReadmeText(readmeStatus))")
+            print("⚖️  Project License: \(getLicenseIndicator(licenseType)) \(licenseType.displayName)")
+
             return
         }
 
@@ -83,29 +70,6 @@ final class PackageUpdateChecker: Sendable {
     }
 
     // MARK: - Private Helpers
-
-    private func findPackageFiles() -> [String] {
-        var files: [String] = []
-
-        guard let enumerator = fileManager.enumerator(atPath: workingDirectory) else {
-            return files
-        }
-
-        for case let path as String in enumerator {
-            // Skip .build directories and test fixtures
-            if path.contains("/.build/") || path.hasPrefix(".build/") ||
-               path.contains("/Fixtures/") || path.contains("-tests/") {
-                continue
-            }
-
-            if path.hasSuffix("Package.swift") || path.hasSuffix("Package.resolved") {
-                let fullPath = (workingDirectory as NSString).appendingPathComponent(path)
-                files.append(fullPath)
-            }
-        }
-
-        return files
-    }
 
     private func findPackages() -> [PackageInfo] {
         var packages: [PackageInfo] = []
@@ -209,30 +173,7 @@ final class PackageUpdateChecker: Sendable {
     }
 
     private func checkReadmeInDirectory(for filePath: String) -> PackageUpdateResult.ReadmeStatus {
-        // Determine the directory to check based on the file path
-        let directory: String
-
-        if filePath.hasSuffix("Package.swift") {
-            // For Package.swift, check in the same directory
-            directory = (filePath as NSString).deletingLastPathComponent
-        } else if filePath.contains("Package.resolved") {
-            // For Package.resolved in Xcode projects, check the project root
-            if filePath.contains(".xcodeproj") {
-                let components = filePath.components(separatedBy: "/")
-                if let xcodeIndex = components.firstIndex(where: { $0.hasSuffix(".xcodeproj") }) {
-                    let projectComponents = components.prefix(xcodeIndex)
-                    directory = projectComponents.joined(separator: "/")
-                } else {
-                    directory = (filePath as NSString).deletingLastPathComponent
-                }
-            } else {
-                // For standalone Package.resolved, check in the same directory
-                directory = (filePath as NSString).deletingLastPathComponent
-            }
-        } else {
-            directory = workingDirectory
-        }
-
+        let directory = getDirectoryPath(for: filePath)
         let readmePath = (directory as NSString).appendingPathComponent("README.md")
         return fileManager.fileExists(atPath: readmePath) ? .present : .missing
     }
