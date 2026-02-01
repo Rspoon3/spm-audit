@@ -10,7 +10,7 @@ import Foundation
 // MARK: - Version
 
 enum Version {
-    static let current = "0.1.2"
+    static let current = "0.2.0"
 }
 
 // MARK: - Version Checker
