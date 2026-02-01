@@ -22,6 +22,9 @@ final class PackageUpdateChecker: Sendable {
     func run() async {
         print("🔍 Auditing project...\n")
 
+        // Find and display local packages with their Swift versions
+        printLocalPackages()
+
         let packages = findPackages()
 
         if packages.isEmpty {
@@ -70,6 +73,95 @@ final class PackageUpdateChecker: Sendable {
     }
 
     // MARK: - Private Helpers
+
+    private struct LocalPackage {
+        let name: String
+        let path: String
+        let swiftVersion: String?
+    }
+
+    private func findLocalPackages() -> [LocalPackage] {
+        var localPackages: [LocalPackage] = []
+
+        guard let enumerator = fileManager.enumerator(atPath: workingDirectory) else {
+            return localPackages
+        }
+
+        for case let path as String in enumerator {
+            // Skip .build directories, test fixtures, and DerivedData
+            if path.contains("/.build/") || path.hasPrefix(".build/") ||
+               path.contains("/Fixtures/") || path.contains("-tests/") ||
+               path.contains("DerivedData/") {
+                continue
+            }
+
+            if path.hasSuffix("Package.swift") {
+                let fullPath = (workingDirectory as NSString).appendingPathComponent(path)
+                let packageDir = (fullPath as NSString).deletingLastPathComponent
+                let packageName = (packageDir as NSString).lastPathComponent
+
+                // Extract swift-tools-version
+                let swiftVersion = extractSwiftVersion(from: packageDir)
+
+                localPackages.append(LocalPackage(
+                    name: packageName,
+                    path: packageDir,
+                    swiftVersion: swiftVersion
+                ))
+            }
+        }
+
+        // Sort by name
+        return localPackages.sorted { $0.name < $1.name }
+    }
+
+    private func printLocalPackages() {
+        let localPackages = findLocalPackages()
+
+        guard !localPackages.isEmpty else {
+            return
+        }
+
+        print("📦 Local Packages:\n")
+
+        // Calculate column widths
+        let nameWidth = max(
+            localPackages.map { $0.name.count }.max() ?? 0,
+            "Package".count
+        ) + 2
+
+        let swiftWidth = max(
+            localPackages.compactMap { $0.swiftVersion?.count }.max() ?? 0,
+            "Swift Version".count
+        ) + 2
+
+        // Print header
+        let separator = "+" + String(repeating: "-", count: nameWidth) +
+                       "+" + String(repeating: "-", count: swiftWidth) + "+"
+
+        print(separator)
+        print("| \(pad("Package", width: nameWidth - 2))" +
+              " | \(pad("Swift Version", width: swiftWidth - 2)) |")
+        print(separator)
+
+        // Print rows
+        for package in localPackages {
+            let swift = package.swiftVersion ?? "N/A"
+            print("| \(pad(package.name, width: nameWidth - 2))" +
+                  " | \(pad(swift, width: swiftWidth - 2)) |")
+        }
+
+        print(separator)
+        print()
+    }
+
+    private func pad(_ text: String, width: Int) -> String {
+        let padding = width - text.count
+        if padding <= 0 {
+            return text
+        }
+        return text + String(repeating: " ", count: padding)
+    }
 
     private func findPackages() -> [PackageInfo] {
         var packages: [PackageInfo] = []
