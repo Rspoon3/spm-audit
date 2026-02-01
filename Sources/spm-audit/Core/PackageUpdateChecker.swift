@@ -54,7 +54,8 @@ final class PackageUpdateChecker: Sendable {
         // Print results grouped by source
         for (filePath, packageResults) in groupedResults.sorted(by: { $0.key < $1.key }) {
             let sortedResults = packageResults.sorted { $0.package.name < $1.package.name }
-            OutputFormatter.printTable(sortedResults, source: filePath)
+            let readmeStatus = checkLocalReadme(for: filePath)
+            OutputFormatter.printTable(sortedResults, source: filePath, readmeStatus: readmeStatus)
         }
     }
 
@@ -68,8 +69,9 @@ final class PackageUpdateChecker: Sendable {
         }
 
         for case let path as String in enumerator {
-            // Skip .build directories
-            if path.contains("/.build/") {
+            // Skip .build directories and test fixtures
+            if path.contains("/.build/") || path.hasPrefix(".build/") ||
+               path.contains("/Fixtures/") || path.contains("-tests/") {
                 continue
             }
 
@@ -111,19 +113,44 @@ final class PackageUpdateChecker: Sendable {
         // Strip .git suffix if present (GitHub API requires URLs without .git)
         let repo = repoWithGit.replacingOccurrences(of: ".git", with: "")
 
-        // Check for updates and README in parallel
-        async let updateResult = githubClient.fetchLatestRelease(owner: owner, repo: repo, package: package)
-        async let readmeStatus = githubClient.checkReadmeExists(owner: owner, repo: repo)
+        let result = await githubClient.fetchLatestRelease(owner: owner, repo: repo, package: package)
 
-        let result = await updateResult
-        let readme = await readmeStatus
-
-        // Return a new result with README status
+        // Return result with unknown README status (will be checked at project level)
         return PackageUpdateResult(
             package: result.package,
             status: result.status,
-            readmeStatus: readme
+            readmeStatus: .unknown
         )
+    }
+
+    private func checkLocalReadme(for filePath: String) -> PackageUpdateResult.ReadmeStatus {
+        // Determine the directory to check based on the file path
+        let directory: String
+        if filePath.hasSuffix("Package.swift") {
+            // For Package.swift, check in the same directory
+            directory = (filePath as NSString).deletingLastPathComponent
+        } else if filePath.contains("Package.resolved") {
+            // For Package.resolved, check in the project root
+            // Navigate up from Package.resolved location to find the project root
+            if filePath.contains(".xcodeproj") {
+                // Xcode project: go up to the .xcodeproj's parent directory
+                let components = filePath.components(separatedBy: "/")
+                if let xcodeIndex = components.firstIndex(where: { $0.hasSuffix(".xcodeproj") }) {
+                    let projectComponents = components.prefix(xcodeIndex)
+                    directory = projectComponents.joined(separator: "/")
+                } else {
+                    directory = workingDirectory
+                }
+            } else {
+                // SPM package: Package.resolved is usually in the root
+                directory = (filePath as NSString).deletingLastPathComponent
+            }
+        } else {
+            directory = workingDirectory
+        }
+
+        let readmePath = (directory as NSString).appendingPathComponent("README.md")
+        return fileManager.fileExists(atPath: readmePath) ? .present : .missing
     }
 
     // MARK: - Public Test Helpers
@@ -166,5 +193,9 @@ final class PackageUpdateChecker: Sendable {
 
     func findPackagesPublic() -> [PackageInfo] {
         return findPackages()
+    }
+
+    public func checkLocalReadmePublic(for filePath: String) -> PackageUpdateResult.ReadmeStatus {
+        return checkLocalReadme(for: filePath)
     }
 }
