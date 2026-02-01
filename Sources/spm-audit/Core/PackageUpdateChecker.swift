@@ -105,6 +105,34 @@ final class PackageUpdateChecker: Sendable {
         }
     }
 
+    private func findCheckoutPath(for packageName: String) -> String? {
+        // Try local .build/checkouts first (for SPM projects)
+        let localCheckoutPath = (workingDirectory as NSString).appendingPathComponent(".build/checkouts/\(packageName)")
+        if fileManager.fileExists(atPath: localCheckoutPath) {
+            return localCheckoutPath
+        }
+
+        // For Xcode projects, check DerivedData
+        // Find all DerivedData directories and look for SourcePackages/checkouts
+        let derivedDataPath = NSString(string: "~/Library/Developer/Xcode/DerivedData").expandingTildeInPath
+
+        guard let derivedDataContents = try? fileManager.contentsOfDirectory(atPath: derivedDataPath) else {
+            return nil
+        }
+
+        // Look through all DerivedData project directories
+        for projectDir in derivedDataContents {
+            let projectPath = (derivedDataPath as NSString).appendingPathComponent(projectDir)
+            let checkoutPath = (projectPath as NSString).appendingPathComponent("SourcePackages/checkouts/\(packageName)")
+
+            if fileManager.fileExists(atPath: checkoutPath) {
+                return checkoutPath
+            }
+        }
+
+        return nil
+    }
+
     func extractSwiftVersion(from checkoutPath: String) -> String? {
         // Check if the checkout directory exists
         guard fileManager.fileExists(atPath: checkoutPath) else {
@@ -154,10 +182,11 @@ final class PackageUpdateChecker: Sendable {
         let result = await githubClient.fetchLatestRelease(owner: owner, repo: repo, package: package)
 
         // Check README, license, and Swift version in the dependency's checkout directory
-        let checkoutPath = (workingDirectory as NSString).appendingPathComponent(".build/checkouts/\(package.name)")
-        let readmeStatus = checkDependencyReadme(in: checkoutPath)
-        let licenseType = checkDependencyLicense(in: checkoutPath)
-        let swiftVersion = extractSwiftVersion(from: checkoutPath)
+        // This works for both SPM projects and Xcode projects (DerivedData)
+        let checkoutPath = findCheckoutPath(for: package.name)
+        let readmeStatus = checkoutPath.map { checkDependencyReadme(in: $0) } ?? .unknown
+        let licenseType = checkoutPath.map { checkDependencyLicense(in: $0) } ?? .unknown
+        let swiftVersion = checkoutPath.flatMap { extractSwiftVersion(from: $0) }
 
         // Create updated package with Swift version
         let updatedPackage = PackageInfo(
