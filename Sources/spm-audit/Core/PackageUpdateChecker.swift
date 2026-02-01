@@ -101,7 +101,8 @@ final class PackageUpdateChecker: Sendable {
               ownerIndex + 2 < components.count else {
             return PackageUpdateResult(
                 package: package,
-                status: .error("Could not parse GitHub URL")
+                status: .error("Could not parse GitHub URL"),
+                readmeStatus: .unknown
             )
         }
 
@@ -110,7 +111,19 @@ final class PackageUpdateChecker: Sendable {
         // Strip .git suffix if present (GitHub API requires URLs without .git)
         let repo = repoWithGit.replacingOccurrences(of: ".git", with: "")
 
-        return await githubClient.fetchLatestRelease(owner: owner, repo: repo, package: package)
+        // Check for updates and README in parallel
+        async let updateResult = githubClient.fetchLatestRelease(owner: owner, repo: repo, package: package)
+        async let readmeStatus = githubClient.checkReadmeExists(owner: owner, repo: repo)
+
+        let result = await updateResult
+        let readme = await readmeStatus
+
+        // Return a new result with README status
+        return PackageUpdateResult(
+            package: result.package,
+            status: result.status,
+            readmeStatus: readme
+        )
     }
 
     // MARK: - Public Test Helpers

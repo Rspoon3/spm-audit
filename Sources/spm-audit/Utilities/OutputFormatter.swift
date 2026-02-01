@@ -41,20 +41,23 @@ enum OutputFormatter {
         ) + 2
 
         let statusWidth = 20
+        let readmeWidth = 8 // "README" + emojis
 
         // Print header
         let separator = "+" + String(repeating: "-", count: nameWidth) +
                        "+" + String(repeating: "-", count: typeWidth) +
                        "+" + String(repeating: "-", count: currentWidth) +
                        "+" + String(repeating: "-", count: latestWidth) +
-                       "+" + String(repeating: "-", count: statusWidth) + "+"
+                       "+" + String(repeating: "-", count: statusWidth) +
+                       "+" + String(repeating: "-", count: readmeWidth) + "+"
 
         print(separator)
         print("| \(pad("Package", width: nameWidth - 2))" +
               " | \(pad("Type", width: typeWidth - 2))" +
               " | \(pad("Current", width: currentWidth - 2))" +
               " | \(pad("Latest", width: latestWidth - 2))" +
-              " | \(pad("Status", width: statusWidth - 2)) |")
+              " | \(pad("Status", width: statusWidth - 2))" +
+              " | \(pad("README", width: readmeWidth - 2)) |")
         print(separator)
 
         // Print rows
@@ -64,12 +67,14 @@ enum OutputFormatter {
             let current = result.package.currentVersion
 
             let (latest, status) = getLatestAndStatus(result.status)
+            let readmeIndicator = getReadmeIndicator(result.readmeStatus)
 
             print("| \(pad(name, width: nameWidth - 2))" +
                   " | \(pad(type, width: typeWidth - 2))" +
                   " | \(pad(current, width: currentWidth - 2))" +
                   " | \(pad(latest, width: latestWidth - 2))" +
-                  " | \(pad(status, width: statusWidth - 2)) |")
+                  " | \(pad(status, width: statusWidth - 2))" +
+                  " | \(pad(readmeIndicator, width: readmeWidth - 2)) |")
         }
 
         print(separator)
@@ -80,7 +85,9 @@ enum OutputFormatter {
             return false
         }.count
 
-        print("\n📊 Summary: \(updateCount) update(s) available")
+        let missingReadmeCount = results.filter { $0.readmeStatus == .missing }.count
+
+        print("\n📊 Summary: \(updateCount) update(s) available, \(missingReadmeCount) missing README(s)")
     }
 
     private static func pad(_ text: String, width: Int) -> String {
@@ -126,6 +133,17 @@ enum OutputFormatter {
             return ("N/A", "⚠️  No releases")
         case .error:
             return ("N/A", "❌ Error")
+        }
+    }
+
+    private static func getReadmeIndicator(_ readmeStatus: PackageUpdateResult.ReadmeStatus) -> String {
+        switch readmeStatus {
+        case .present:
+            return "✅"
+        case .missing:
+            return "❌"
+        case .unknown:
+            return "❓"
         }
     }
 

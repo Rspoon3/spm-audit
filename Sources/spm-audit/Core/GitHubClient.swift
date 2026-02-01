@@ -51,7 +51,7 @@ final class GitHubClient: Sendable {
         let urlString = "https://api.github.com/repos/\(owner)/\(repo)/releases"
 
         guard let url = URL(string: urlString) else {
-            return PackageUpdateResult(package: package, status: .error("Invalid API URL"))
+            return PackageUpdateResult(package: package, status: .error("Invalid API URL"), readmeStatus: .unknown)
         }
 
         var request = URLRequest(url: url)
@@ -66,7 +66,7 @@ final class GitHubClient: Sendable {
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                return PackageUpdateResult(package: package, status: .error("Invalid response"))
+                return PackageUpdateResult(package: package, status: .error("Invalid response"), readmeStatus: .unknown)
             }
 
             // If releases endpoint returns 404, fall back to tags
@@ -77,7 +77,8 @@ final class GitHubClient: Sendable {
             guard httpResponse.statusCode == 200 else {
                 return PackageUpdateResult(
                     package: package,
-                    status: .error("API error (status \(httpResponse.statusCode))")
+                    status: .error("API error (status \(httpResponse.statusCode))"),
+                    readmeStatus: .unknown
                 )
             }
 
@@ -96,19 +97,22 @@ final class GitHubClient: Sendable {
             if VersionHelpers.compare(latestVersion, package.currentVersion) {
                 return PackageUpdateResult(
                     package: package,
-                    status: .updateAvailable(current: package.currentVersion, latest: latestVersion)
+                    status: .updateAvailable(current: package.currentVersion, latest: latestVersion),
+                    readmeStatus: .unknown
                 )
             } else {
                 return PackageUpdateResult(
                     package: package,
-                    status: .upToDate(latestVersion)
+                    status: .upToDate(latestVersion),
+                    readmeStatus: .unknown
                 )
             }
 
         } catch {
             return PackageUpdateResult(
                 package: package,
-                status: .error(error.localizedDescription)
+                status: .error(error.localizedDescription),
+                readmeStatus: .unknown
             )
         }
     }
@@ -118,7 +122,7 @@ final class GitHubClient: Sendable {
         let urlString = "https://api.github.com/repos/\(owner)/\(repo)/tags?per_page=100"
 
         guard let url = URL(string: urlString) else {
-            return PackageUpdateResult(package: package, status: .error("Invalid API URL"))
+            return PackageUpdateResult(package: package, status: .error("Invalid API URL"), readmeStatus: .unknown)
         }
 
         var request = URLRequest(url: url)
@@ -132,17 +136,18 @@ final class GitHubClient: Sendable {
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                return PackageUpdateResult(package: package, status: .error("Invalid response"))
+                return PackageUpdateResult(package: package, status: .error("Invalid response"), readmeStatus: .unknown)
             }
 
             if httpResponse.statusCode == 404 {
-                return PackageUpdateResult(package: package, status: .noReleases)
+                return PackageUpdateResult(package: package, status: .noReleases, readmeStatus: .unknown)
             }
 
             guard httpResponse.statusCode == 200 else {
                 return PackageUpdateResult(
                     package: package,
-                    status: .error("API error (status \(httpResponse.statusCode))")
+                    status: .error("API error (status \(httpResponse.statusCode))"),
+                    readmeStatus: .unknown
                 )
             }
 
@@ -162,7 +167,7 @@ final class GitHubClient: Sendable {
                 }
 
             guard let latestTag = validTags.first else {
-                return PackageUpdateResult(package: package, status: .noReleases)
+                return PackageUpdateResult(package: package, status: .noReleases, readmeStatus: .unknown)
             }
 
             let latestVersion = VersionHelpers.normalize(latestTag.normalized)
@@ -170,19 +175,22 @@ final class GitHubClient: Sendable {
             if VersionHelpers.compare(latestVersion, package.currentVersion) {
                 return PackageUpdateResult(
                     package: package,
-                    status: .updateAvailable(current: package.currentVersion, latest: latestVersion)
+                    status: .updateAvailable(current: package.currentVersion, latest: latestVersion),
+                    readmeStatus: .unknown
                 )
             } else {
                 return PackageUpdateResult(
                     package: package,
-                    status: .upToDate(latestVersion)
+                    status: .upToDate(latestVersion),
+                    readmeStatus: .unknown
                 )
             }
 
         } catch {
             return PackageUpdateResult(
                 package: package,
-                status: .error(error.localizedDescription)
+                status: .error(error.localizedDescription),
+                readmeStatus: .unknown
             )
         }
     }
@@ -223,5 +231,39 @@ final class GitHubClient: Sendable {
         }
 
         return try JSONDecoder().decode([GitHubRelease].self, from: data)
+    }
+
+    func checkReadmeExists(owner: String, repo: String) async -> PackageUpdateResult.ReadmeStatus {
+        let urlString = "https://api.github.com/repos/\(owner)/\(repo)/readme"
+
+        guard let url = URL(string: urlString) else {
+            return .unknown
+        }
+
+        var request = URLRequest(url: url)
+        request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
+
+        if let token = githubToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return .unknown
+            }
+
+            switch httpResponse.statusCode {
+            case 200:
+                return .present
+            case 404:
+                return .missing
+            default:
+                return .unknown
+            }
+        } catch {
+            return .unknown
+        }
     }
 }
