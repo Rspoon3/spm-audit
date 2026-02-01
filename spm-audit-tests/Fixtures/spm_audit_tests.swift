@@ -334,7 +334,7 @@ struct VersionTests {
     @Test("Version constant is valid semantic version")
     func testVersionFormat() async throws {
         // Version should be in semantic version format (X.Y.Z)
-        let components = currentVersion.split(separator: ".")
+        let components = Version.current.split(separator: ".")
 
         #expect(components.count == 3, "Version should have 3 components (major.minor.patch)")
 
@@ -346,9 +346,9 @@ struct VersionTests {
 
     @Test("Version constant matches expected format")
     func testVersionNotEmpty() async throws {
-        #expect(!currentVersion.isEmpty, "Version should not be empty")
-        #expect(!currentVersion.contains("v"), "Version should not contain 'v' prefix")
-        #expect(!currentVersion.contains(" "), "Version should not contain spaces")
+        #expect(!Version.current.isEmpty, "Version should not be empty")
+        #expect(!Version.current.contains("v"), "Version should not contain 'v' prefix")
+        #expect(!Version.current.contains(" "), "Version should not contain spaces")
     }
 }
 
