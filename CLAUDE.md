@@ -50,10 +50,14 @@
 spm-audit/
 ├── Sources/
 │   └── spm-audit/
-│       └── main.swift          # All source code (CLI, models, logic)
-├── Tests/
-│   ├── Fixtures/               # Test fixtures for Package.swift and .pbxproj files
-│   └── spm-audit-tests/        # Test target
+│       ├── SPMAudit.swift      # Entry point (@main)
+│       ├── Commands/           # CLI command definitions
+│       ├── Core/               # Main business logic
+│       ├── Models/             # Data models
+│       ├── Parsers/            # File parsing logic
+│       └── Utilities/          # Helper functions
+├── spm-audit-tests/
+│   └── Fixtures/               # Test fixtures for Package.swift and .pbxproj files
 ├── Package.swift               # SPM manifest
 └── Package.resolved            # Dependency lock file
 ```
@@ -117,17 +121,30 @@ Use the automated release script to create a new version:
 
 **Example:**
 ```bash
-./release.sh 0.1.2 "Add automatic version checking"
+./release.sh 0.2.0 "Add tag fallback support"
 ```
 
 **What the script does:**
-1. Updates version constant in `Sources/spm-audit/main.swift`
+1. Updates version constant in `Sources/spm-audit/Utilities/VersionChecker.swift`
 2. Commits and pushes the version bump
 3. Creates and pushes a git tag
 4. Creates a GitHub release with notes
 5. Calculates SHA256 for the release tarball
 6. Updates the Homebrew formula in `homebrew-tap` repository
 7. Pushes the formula update
+
+**After running the script:**
+1. Mark the release as a **pre-release** on GitHub until ready for stable
+2. Ensure the release **title is just the version number** (e.g., "0.2.0", not "0.2.0 - Description")
+
+Use these commands:
+```bash
+# Mark as pre-release
+gh release edit <version> --prerelease --repo Rspoon3/spm-audit
+
+# Update title to just version number
+gh release edit <version> --title "<version>" --repo Rspoon3/spm-audit
+```
 
 After running, users can update via:
 ```bash
