@@ -22,9 +22,6 @@ final class PackageUpdateChecker: Sendable {
     func run() async {
         print("🔍 Auditing project...\n")
 
-        // Find and display local packages with their Swift versions
-        printLocalPackages()
-
         let packages = findPackages()
 
         if packages.isEmpty {
@@ -34,9 +31,11 @@ final class PackageUpdateChecker: Sendable {
             // Check in the working directory (root project)
             let readmeStatus = checkReadmeInDirectory(for: workingDirectory)
             let licenseType = checkLicenseInDirectory(for: workingDirectory)
+            let localPackages = findLocalPackages()
 
             print("\n📄 Project README: \(getReadmeIndicator(readmeStatus)) \(getReadmeText(readmeStatus))")
             print("⚖️  Project License: \(getLicenseIndicator(licenseType)) \(licenseType.displayName)")
+            printLocalPackageSwiftVersions(localPackages)
 
             return
         }
@@ -70,6 +69,10 @@ final class PackageUpdateChecker: Sendable {
             let licenseType = checkLicenseInDirectory(for: filePath)
             OutputFormatter.printTable(sortedResults, source: filePath, readmeStatus: readmeStatus, licenseType: licenseType)
         }
+
+        // Print local package Swift versions at the end
+        let localPackages = findLocalPackages()
+        printLocalPackageSwiftVersions(localPackages)
     }
 
     // MARK: - Private Helpers
@@ -115,52 +118,16 @@ final class PackageUpdateChecker: Sendable {
         return localPackages.sorted { $0.name < $1.name }
     }
 
-    private func printLocalPackages() {
-        let localPackages = findLocalPackages()
-
+    private func printLocalPackageSwiftVersions(_ localPackages: [LocalPackage]) {
         guard !localPackages.isEmpty else {
             return
         }
 
-        print("📦 Local Packages:\n")
-
-        // Calculate column widths
-        let nameWidth = max(
-            localPackages.map { $0.name.count }.max() ?? 0,
-            "Package".count
-        ) + 2
-
-        let swiftWidth = max(
-            localPackages.compactMap { $0.swiftVersion?.count }.max() ?? 0,
-            "Swift Version".count
-        ) + 2
-
-        // Print header
-        let separator = "+" + String(repeating: "-", count: nameWidth) +
-                       "+" + String(repeating: "-", count: swiftWidth) + "+"
-
-        print(separator)
-        print("| \(pad("Package", width: nameWidth - 2))" +
-              " | \(pad("Swift Version", width: swiftWidth - 2)) |")
-        print(separator)
-
-        // Print rows
+        print("\n🔧 Local Package Swift Versions:")
         for package in localPackages {
-            let swift = package.swiftVersion ?? "N/A"
-            print("| \(pad(package.name, width: nameWidth - 2))" +
-                  " | \(pad(swift, width: swiftWidth - 2)) |")
+            let version = package.swiftVersion ?? "N/A"
+            print("   \(package.name): \(version)")
         }
-
-        print(separator)
-        print()
-    }
-
-    private func pad(_ text: String, width: Int) -> String {
-        let padding = width - text.count
-        if padding <= 0 {
-            return text
-        }
-        return text + String(repeating: " ", count: padding)
     }
 
     private func findPackages() -> [PackageInfo] {
