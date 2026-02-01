@@ -25,7 +25,7 @@ enum OutputFormatter {
         // Create table with columns
         let table = ASCIITable(columns: ["Package", "Type", "Current", "Swift", "Latest", "Status",
                                           "README", "License", "CLAUDE.md", "AGENTS.md", "Last Commit"])
-            .sort(.by(column: "Package"))
+            .sort(.by(column: "Package", transform: { $0.lowercased() }))
 
         // Add rows for each result
         for result in results {
