@@ -20,12 +20,12 @@ RELEASE_NOTES=${2:-"Release $VERSION"}
 
 echo -e "${GREEN}🚀 Starting release process for version $VERSION${NC}\n"
 
-# Step 1: Update version in main.swift
-echo -e "${YELLOW}📝 Step 1: Updating version in main.swift${NC}"
-sed -i '' "s/let currentVersion = \".*\"/let currentVersion = \"$VERSION\"/" Sources/spm-audit/main.swift
+# Step 1: Update version in VersionChecker.swift
+echo -e "${YELLOW}📝 Step 1: Updating version in VersionChecker.swift${NC}"
+sed -i '' "s/static let current = \".*\"/static let current = \"$VERSION\"/" Sources/spm-audit/Utilities/VersionChecker.swift
 
-if ! git diff --quiet Sources/spm-audit/main.swift; then
-    git add Sources/spm-audit/main.swift
+if ! git diff --quiet Sources/spm-audit/Utilities/VersionChecker.swift; then
+    git add Sources/spm-audit/Utilities/VersionChecker.swift
     git commit -m "Bump version to $VERSION"
     git push origin main
     echo -e "${GREEN}✓ Version updated and pushed${NC}\n"
