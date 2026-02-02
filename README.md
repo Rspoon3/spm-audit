@@ -27,6 +27,12 @@ cp .build/release/spm-audit /usr/local/bin/
 swift run spm-audit
 ```
 
+### Using [Mint](https://github.com/yonaskolb/Mint)
+
+```bash
+mint run Rspoon3/spm-audit
+```
+
 ## Usage
 
 ### Audit Packages
